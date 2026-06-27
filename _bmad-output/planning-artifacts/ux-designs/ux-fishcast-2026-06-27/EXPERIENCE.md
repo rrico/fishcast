@@ -18,17 +18,17 @@ Two modes, one app: **Manager** and **Angler** share navigation, the fishery/sea
 
 ## Information Architecture
 
-| Surface | Reached from | Purpose |
-|---|---|---|
-| Fishery Picker | App open (cold) | Choose a fishery + season; entry point for both modes |
-| Angler View | Mode toggle → Angler (default) | Reported / estimated / projected harvest snapshot for the chosen fishery (FR-7) |
-| Manager View | Mode toggle → Manager | Harvest vs. TAC/control-rule status, encounters, CPUE, effort (FR-5) |
-| Share Summary | "Share" action on Manager View | Exportable/printable view for briefing co-managers (FR-6) |
-| Forecast Accuracy | Linked from both Angler and Manager views | Past projections vs. later-confirmed actuals (FR-8) |
+| Surface | Reached from | Purpose | Mock |
+|---|---|---|---|
+| Fishery Picker | App open (cold) | Choose a fishery + season; entry point for both modes | [`mockups/key-fishery-picker.html`](mockups/key-fishery-picker.html) |
+| Angler View | Mode toggle → Angler (default) | Reported / estimated / projected harvest snapshot for the chosen fishery (FR-7) | [`mockups/key-angler-view.html`](mockups/key-angler-view.html) |
+| Manager View | Mode toggle → Manager | Harvest vs. TAC/control-rule status, encounters, CPUE, effort (FR-5) | [`mockups/key-manager-view.html`](mockups/key-manager-view.html) |
+| Share Summary | "Share" action on Manager View | Exportable/printable view for briefing co-managers (FR-6) | [`mockups/key-share-summary.html`](mockups/key-share-summary.html) |
+| Forecast Accuracy | Linked from both Angler and Manager views | Past projections vs. later-confirmed actuals (FR-8) | [`mockups/key-forecast-accuracy.html`](mockups/key-forecast-accuracy.html) |
 
 No drawer, no nested settings menu — v1 has no accounts, so there is no Settings surface. Modal/sheet stacking is one level deep at most (e.g., Share Summary opens as an overlay on Manager View, nothing opens on top of it).
 
-→ Composition reference: `mockups/` (key screens added at Finalize). Spine wins on conflict.
+→ Composition reference: `mockups/` (all five IA surfaces have a rendered key-screen mock). Spine wins on conflict with any mock.
 
 ## Voice and Tone
 
@@ -102,6 +102,8 @@ Behavioral. Visual contrast lives in `DESIGN.md` (palette chosen to maintain WCA
 
 Failure: today's creel data hasn't landed yet → Manager View shows yesterday's numbers with a visible "as of {yesterday's date}" timestamp; Mark knows to treat the read as slightly stale, not wrong.
 
+→ Mock: [`mockups/key-manager-view.html`](mockups/key-manager-view.html) (steps 2–4), [`mockups/key-share-summary.html`](mockups/key-share-summary.html) (step 5).
+
 ### Flow 2 — TrollRay decides whether to fish the Skagit sockeye run this weekend (TrollRay, weekend salmon angler)
 
 1. TrollRay opens fishcast on his phone Thursday night, picks "Skagit Sockeye 2026" from the Fishery Picker. Mode toggle defaults to Angler.
@@ -111,6 +113,8 @@ Failure: today's creel data hasn't landed yet → Manager View shows yesterday's
 5. He checks the Forecast Accuracy link out of curiosity — last week's projection was within a stated margin of the confirmed estimate — and decides he trusts the read enough to commit to Saturday.
 
 Failure: the run is projected to taper sharply by Saturday → the projection band visibly narrows and drops; TrollRay decides to go Thursday or Friday instead, which is exactly the decision the projection exists to support.
+
+→ Mock: [`mockups/key-angler-view.html`](mockups/key-angler-view.html) (steps 1–4), [`mockups/key-forecast-accuracy.html`](mockups/key-forecast-accuracy.html) (step 5).
 
 ## Inspiration & Anti-patterns
 

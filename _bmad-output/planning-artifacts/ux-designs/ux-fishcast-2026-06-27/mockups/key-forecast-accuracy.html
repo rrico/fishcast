@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>fishcast — Forecast Accuracy</title>
+<style>
+/*
+  Spine sections illustrated:
+  - EXPERIENCE.md Information Architecture: Forecast Accuracy view, linked from both Angler and Manager views (FR-8)
+  - EXPERIENCE.md Component Patterns: "Accuracy strip" — past projection (band) overlaid with confirmed actual (point), framed in plain language first, raw error stats secondary
+  - DESIGN.md Components: "Accuracy strip — no new tokens; reuses harvest-number-trio's `estimated` treatment for the confirmed-actual point and `projected` treatment for the past projection's band"
+  - EXPERIENCE.md State Patterns: "Accuracy not yet available" ("Too recent to score — check back once {date}'s estimate is confirmed") shown as the second, most-recent row
+  - EXPERIENCE.md Key Flow 2 (TrollRay): "last week's projection was within a stated margin of the confirmed estimate" — the plain-language framing on this screen is that exact sentence
+  - EXPERIENCE.md Accessibility Floor: chart has a text/table equivalent reachable without hover
+  - EXPERIENCE.md Inspiration & Anti-patterns: rejected gamified accuracy scoring (no streaks/leaderboards/badges)
+*/
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #EFEEEA;
+  font-family: 'Roboto', Arial, sans-serif;
+  color: #222222;
+  padding: 40px 0;
+}
+
+.browser-frame {
+  max-width: 880px;
+  margin: 0 auto;
+  background: #FFFFFF;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  border: 1px solid #D1D3D4;
+}
+.browser-chrome {
+  background: #F7F7F5;
+  border-bottom: 1px solid #D1D3D4;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.browser-dot { width: 11px; height: 11px; border-radius: 9999px; background: #D1D3D4; }
+.browser-urlbar {
+  margin-left: 10px;
+  flex: 1;
+  background: #FFFFFF;
+  border: 1px solid #D1D3D4;
+  border-radius: 9999px;
+  font-size: 12px;
+  color: #5A594D;
+  padding: 5px 14px;
+}
+
+.app-header {
+  background: #0F426B;
+  color: #FFFFFF;
+  padding: 14px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.app-name { font-family: 'Roboto Slab', Georgia, serif; font-size: 20px; font-weight: 400; }
+.mode-toggle { background: rgba(255,255,255,0.16); border-radius: 9999px; display: inline-flex; padding: 3px; }
+.mode-toggle button {
+  border: none; background: transparent;
+  font-size: 13px; font-weight: 500; letter-spacing: 0.02em;
+  color: #FFFFFF; padding: 8px 18px; border-radius: 9999px; min-height: 32px;
+}
+.mode-toggle button.active { background: #FFFFFF; color: #0F426B; }
+
+.fishery-bar {
+  padding: 14px 32px;
+  border-bottom: 1px solid #D1D3D4;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.fishery-bar .name { font-family: 'Roboto Slab', Georgia, serif; font-size: 20px; color: #59594A; }
+.fishery-bar .back { font-size: 13px; color: #18459A; }
+
+.content { padding: 28px 32px 36px; }
+
+.page-title {
+  font-family: 'Roboto Slab', Georgia, serif;
+  font-size: 26px;
+  color: #59594A;
+  margin-bottom: 4px;
+}
+.page-sub {
+  font-size: 14px;
+  color: #5A594D;
+  margin-bottom: 24px;
+  max-width: 560px;
+}
+
+.strip-row {
+  border: 1px solid #D1D3D4;
+  border-radius: 8px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.strip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.strip-period {
+  font-family: 'Roboto Slab', Georgia, serif;
+  font-size: 16px;
+  color: #59594A;
+}
+.strip-confirmed-on {
+  font-size: 12px;
+  color: #5A594D;
+}
+
+.strip-body {
+  display: grid;
+  grid-template-columns: 1fr 230px;
+  gap: 24px;
+  align-items: center;
+}
+
+.plain-language {
+  font-size: 16px;
+  line-height: 1.5;
+  color: #222222;
+}
+.plain-language b { color: #0F426B; }
+
+.raw-stats {
+  margin-top: 10px;
+}
+.raw-stats summary {
+  font-size: 12px;
+  color: #5A594D;
+  cursor: pointer;
+}
+.raw-stats-table {
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.raw-stats-table td {
+  padding: 3px 10px 3px 0;
+  color: #5A594D;
+}
+.raw-stats-table td.val { color: #222222; font-weight: 500; }
+
+.legend {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #5A594D; }
+.legend-swatch { width: 14px; height: 3px; border-radius: 2px; }
+.legend-dot { width: 9px; height: 9px; border-radius: 9999px; }
+
+.chart-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 11px;
+}
+.chart-table caption {
+  text-align: left;
+  font-size: 11px;
+  color: #5A594D;
+  margin-bottom: 4px;
+}
+.chart-table th, .chart-table td {
+  text-align: center;
+  padding: 3px 2px;
+  color: #5A594D;
+  border-top: 1px solid #EFEEEA;
+}
+.chart-table th { font-weight: 500; color: #222222; }
+
+.pending-row {
+  border: 1px dashed #D1D3D4;
+  border-radius: 8px;
+  padding: 18px 20px;
+  background: #F7F7F5;
+}
+.pending-row .strip-period { color: #5A594D; }
+.pending-copy {
+  font-size: 14px;
+  color: #5A594D;
+  margin-top: 6px;
+}
+</style>
+</head>
+<body>
+
+<div class="browser-frame">
+  <div class="browser-chrome">
+    <div class="browser-dot"></div><div class="browser-dot"></div><div class="browser-dot"></div>
+    <div class="browser-urlbar">fishcast.app/skagit-sockeye-2026/accuracy</div>
+  </div>
+
+  <div class="app-header">
+    <div class="app-name">fishcast</div>
+    <div class="mode-toggle">
+      <button>Manager</button>
+      <button class="active">Angler</button>
+    </div>
+  </div>
+
+  <div class="fishery-bar">
+    <span class="name">Skagit Sockeye 2026 — Forecast Accuracy</span>
+    <a class="back" href="#">← Back to Angler View</a>
+  </div>
+
+  <div class="content">
+    <div class="page-title">How fishcast's projections have tracked</div>
+    <div class="page-sub">Each past forward projection, compared against the harvest estimate once it was later confirmed.</div>
+
+    <div class="strip-row">
+      <div class="strip-head">
+        <span class="strip-period">Projection made June 19, for June 26</span>
+        <span class="strip-confirmed-on">Confirmed June 27</span>
+      </div>
+      <div class="strip-body">
+        <div>
+          <div class="plain-language">Last week's projection was within <b>18 fish</b> of the confirmed estimate.</div>
+          <details class="raw-stats">
+            <summary>Raw error stats</summary>
+            <table class="raw-stats-table">
+              <tr><td>Projected range</td><td class="val">365–445</td></tr>
+              <tr><td>Confirmed estimate</td><td class="val">427</td></tr>
+              <tr><td>Point estimate error</td><td class="val">−18 fish</td></tr>
+              <tr><td>Confirmed within range?</td><td class="val">Yes</td></tr>
+            </table>
+          </details>
+        </div>
+        <div>
+          <svg viewBox="0 0 220 90" width="100%" height="90" role="img" aria-label="Projected range 365 to 445 fish for June 26, confirmed actual 427 fish, within range">
+            <line x1="0" y1="20" x2="220" y2="20" stroke="#EFEEEA" stroke-width="1"/>
+            <line x1="0" y1="50" x2="220" y2="50" stroke="#EFEEEA" stroke-width="1"/>
+            <line x1="0" y1="80" x2="220" y2="80" stroke="#5A594D" stroke-width="1"/>
+            <rect x="20" y="32" width="180" height="28" fill="#92D2D8" fill-opacity="0.18"/>
+            <line x1="20" y1="46" x2="200" y2="46" stroke="#92D2D8" stroke-width="2.5" stroke-dasharray="6,4"/>
+            <circle cx="148" cy="40" r="5" fill="#0F426B"/>
+            <text x="20" y="75" font-family="Roboto" font-size="9" fill="#5A594D">365</text>
+            <text x="185" y="75" font-family="Roboto" font-size="9" fill="#5A594D">445</text>
+          </svg>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-swatch" style="background:#92D2D8;"></span>Past projected range</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#0F426B;"></span>Confirmed actual</span>
+          </div>
+          <table class="chart-table">
+            <caption>Text equivalent</caption>
+            <tr><th>Projected</th><th>Confirmed</th><th>Diff</th></tr>
+            <tr><td>365–445</td><td>427</td><td>−18</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="strip-row">
+      <div class="strip-head">
+        <span class="strip-period">Projection made June 12, for June 19</span>
+        <span class="strip-confirmed-on">Confirmed June 20</span>
+      </div>
+      <div class="strip-body">
+        <div>
+          <div class="plain-language">That projection was within <b>31 fish</b> of the confirmed estimate.</div>
+          <details class="raw-stats">
+            <summary>Raw error stats</summary>
+            <table class="raw-stats-table">
+              <tr><td>Projected range</td><td class="val">298–372</td></tr>
+              <tr><td>Confirmed estimate</td><td class="val">366</td></tr>
+              <tr><td>Point estimate error</td><td class="val">−31 fish</td></tr>
+              <tr><td>Confirmed within range?</td><td class="val">Yes</td></tr>
+            </table>
+          </details>
+        </div>
+        <div>
+          <svg viewBox="0 0 220 90" width="100%" height="90" role="img" aria-label="Projected range 298 to 372 fish for June 19, confirmed actual 366 fish, within range">
+            <line x1="0" y1="20" x2="220" y2="20" stroke="#EFEEEA" stroke-width="1"/>
+            <line x1="0" y1="50" x2="220" y2="50" stroke="#EFEEEA" stroke-width="1"/>
+            <line x1="0" y1="80" x2="220" y2="80" stroke="#5A594D" stroke-width="1"/>
+            <rect x="20" y="36" width="180" height="24" fill="#92D2D8" fill-opacity="0.18"/>
+            <line x1="20" y1="48" x2="200" y2="48" stroke="#92D2D8" stroke-width="2.5" stroke-dasharray="6,4"/>
+            <circle cx="188" cy="44" r="5" fill="#0F426B"/>
+            <text x="20" y="75" font-family="Roboto" font-size="9" fill="#5A594D">298</text>
+            <text x="185" y="75" font-family="Roboto" font-size="9" fill="#5A594D">372</text>
+          </svg>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-swatch" style="background:#92D2D8;"></span>Past projected range</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#0F426B;"></span>Confirmed actual</span>
+          </div>
+          <table class="chart-table">
+            <caption>Text equivalent</caption>
+            <tr><th>Projected</th><th>Confirmed</th><th>Diff</th></tr>
+            <tr><td>298–372</td><td>366</td><td>−31</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="pending-row">
+      <div class="strip-head">
+        <span class="strip-period">Projection made June 26, for July 3</span>
+      </div>
+      <div class="pending-copy">Too recent to score — check back once July 3's estimate is confirmed.</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
