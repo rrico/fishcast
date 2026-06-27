@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>fishcast — Fishery Picker</title>
+<style>
+/*
+  Spine sections illustrated:
+  - EXPERIENCE.md Information Architecture: "Fishery Picker | App open (cold) | Choose a fishery + season; entry point for both modes"
+  - EXPERIENCE.md Component Patterns: "Fishery/season picker" row — type-to-filter combobox, not a long unfiltered list; recently viewed fisheries surface first
+  - DESIGN.md components.fishery-picker — input-radius/row-radius {rounded.sm}, row-recent-background {colors.surface-muted}
+  - EXPERIENCE.md State Patterns: "Threshold exceeded" row (badge visible from picker, not just inside fishery's own view), "Empty fishery list / no match in picker"
+  - EXPERIENCE.md Accessibility Floor: tap targets >= 44x44px on picker rows
+  - DESIGN.md Components: Status badge (pill, three variants, text + color)
+*/
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #EFEEEA;
+  font-family: 'Roboto', Arial, sans-serif;
+  color: #222222;
+  padding: 40px 0;
+}
+
+/* Browser frame */
+.browser-frame {
+  max-width: 920px;
+  margin: 0 auto;
+  background: #FFFFFF;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  border: 1px solid #D1D3D4;
+}
+.browser-chrome {
+  background: #F7F7F5;
+  border-bottom: 1px solid #D1D3D4;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.browser-dot { width: 11px; height: 11px; border-radius: 9999px; background: #D1D3D4; }
+.browser-urlbar {
+  margin-left: 10px;
+  flex: 1;
+  background: #FFFFFF;
+  border: 1px solid #D1D3D4;
+  border-radius: 9999px;
+  font-size: 12px;
+  color: #5A594D;
+  padding: 5px 14px;
+  font-family: 'Roboto', Arial, sans-serif;
+}
+
+/* App header */
+.app-header {
+  background: #0F426B;
+  color: #FFFFFF;
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.app-name {
+  font-family: 'Roboto Slab', Georgia, serif;
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+.mode-toggle {
+  background: rgba(255,255,255,0.16);
+  border-radius: 9999px;
+  display: inline-flex;
+  padding: 3px;
+}
+.mode-toggle button {
+  border: none;
+  background: transparent;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #FFFFFF;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  min-height: 32px;
+}
+.mode-toggle button.active {
+  background: #FFFFFF;
+  color: #0F426B;
+}
+
+/* Body */
+.picker-body {
+  padding: 48px 28px 56px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.picker-eyebrow {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #5A594D;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.picker-heading {
+  font-family: 'Roboto Slab', Georgia, serif;
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1.25;
+  color: #59594A;
+  margin-bottom: 24px;
+}
+
+.combobox {
+  position: relative;
+  margin-bottom: 8px;
+}
+.combobox input {
+  width: 100%;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 16px;
+  color: #222222;
+  background: #FFFFFF;
+  border: 1px solid #D1D3D4;
+  border-radius: 4px;
+  padding: 14px 16px;
+  min-height: 44px;
+}
+.combobox .hint {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 12px;
+  color: #5A594D;
+  margin: 6px 2px 20px;
+}
+
+.section-label {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #5A594D;
+  text-transform: uppercase;
+  margin: 4px 0 10px;
+}
+
+.row-list {
+  border: 1px solid #D1D3D4;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 28px;
+}
+.fishery-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  min-height: 44px;
+  border-radius: 4px;
+  border-bottom: 1px solid #EFEEEA;
+}
+.row-list .fishery-row:last-child { border-bottom: none; }
+.fishery-row.recent { background: #F7F7F5; }
+.fishery-row .meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fishery-row .fishery-name {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #222222;
+}
+.fishery-row .fishery-sub {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 13px;
+  color: #5A594D;
+}
+.row-right { display: flex; align-items: center; gap: 10px; }
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+.status-badge.safe { background: #007B55; color: #FFFFFF; }
+.status-badge.watch { background: #FFD12E; color: #222222; }
+.status-badge.exceeded { background: #AA1F2E; color: #FFFFFF; }
+
+.chevron {
+  width: 8px; height: 8px;
+  border-right: 2px solid #5A594D;
+  border-bottom: 2px solid #5A594D;
+  transform: rotate(-45deg);
+}
+
+.empty-link-note {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 13px;
+  color: #5A594D;
+  margin-top: -10px;
+  margin-bottom: 28px;
+}
+.empty-link-note a { color: #18459A; text-decoration: underline; }
+
+.footer-note {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 12px;
+  color: #5A594D;
+  text-align: center;
+  margin-top: 8px;
+}
+</style>
+</head>
+<body>
+
+<div class="browser-frame">
+  <div class="browser-chrome">
+    <div class="browser-dot"></div>
+    <div class="browser-dot"></div>
+    <div class="browser-dot"></div>
+    <div class="browser-urlbar">fishcast.app</div>
+  </div>
+
+  <div class="app-header">
+    <div class="app-name">fishcast</div>
+    <div class="mode-toggle">
+      <button class="active">Angler</button>
+      <button>Manager</button>
+    </div>
+  </div>
+
+  <div class="picker-body">
+    <div class="picker-eyebrow">Choose a fishery</div>
+    <div class="picker-heading">Which fishery and season?</div>
+
+    <div class="combobox">
+      <input type="text" value="sk" readonly>
+    </div>
+    <div class="hint">Type to filter — covers WA rivers and marine areas tracked by fishcast.</div>
+
+    <div class="section-label">Recently viewed</div>
+    <div class="row-list">
+      <div class="fishery-row recent">
+        <div class="meta">
+          <span class="fishery-name">Skagit Sockeye 2026</span>
+          <span class="fishery-sub">River · Skagit County</span>
+        </div>
+        <div class="row-right">
+          <span class="status-badge safe">Under threshold</span>
+          <span class="chevron"></span>
+        </div>
+      </div>
+      <div class="fishery-row recent">
+        <div class="meta">
+          <span class="fishery-name">Skagit Chinook 2026</span>
+          <span class="fishery-sub">River · Puget Sound ESA-listed stock</span>
+        </div>
+        <div class="row-right">
+          <span class="status-badge watch">Approaching</span>
+          <span class="chevron"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">All matches</div>
+    <div class="row-list">
+      <div class="fishery-row">
+        <div class="meta">
+          <span class="fishery-name">Skagit Coho 2026</span>
+          <span class="fishery-sub">River · Skagit County</span>
+        </div>
+        <div class="row-right">
+          <span class="status-badge safe">Under threshold</span>
+          <span class="chevron"></span>
+        </div>
+      </div>
+      <div class="fishery-row">
+        <div class="meta">
+          <span class="fishery-name">Skykomish Steelhead 2026</span>
+          <span class="fishery-sub">River · Snohomish County</span>
+        </div>
+        <div class="row-right">
+          <span class="status-badge safe">Under threshold</span>
+          <span class="chevron"></span>
+        </div>
+      </div>
+      <div class="fishery-row">
+        <div class="meta">
+          <span class="fishery-name">Marine Area 9 (Skagit Bay) Chinook 2026</span>
+          <span class="fishery-sub">Marine Area · Admiralty Inlet</span>
+        </div>
+        <div class="row-right">
+          <span class="status-badge exceeded">Exceeded</span>
+          <span class="chevron"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-note">fishcast currently covers 24 WA fisheries — see the full list.</div>
+  </div>
+</div>
+
+</body>
+</html>

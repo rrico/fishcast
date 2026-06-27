@@ -3,7 +3,7 @@ name: fishcast
 description: Probabilistic salmon/steelhead harvest forecasts for WA sport fisheries. WDFW-inspired but standalone — a hobby project, not an official agency product.
 status: draft
 sources:
-  - "{planning_artifacts}/prds/prd-fishcast-2026-06-27/prd.md"
+  - "{planning_artifacts}/prd-fishcast-2026-06-27/prd.md"
   - "https://github.com/wdfw-fp/CreelEstimates/blob/main/template_scripts/styleRmd_WDFW.css"
 updated: 2026-06-27
 colors:
@@ -108,7 +108,7 @@ components:
     activeBackground: '{colors.primary}'
     activeForeground: '{colors.primary-foreground}'
     radius: '{rounded.full}'
-  harvest-number:
+  harvest-number-trio:
     reported:
       color: '{colors.data-reported}'
       style: 'outline / hollow marker'
@@ -122,6 +122,23 @@ components:
     background: '{colors.surface}'
     border: '{colors.border}'
     radius: '{rounded.md}'
+  projection-band-chart:
+    line: '{colors.data-projected}'
+    band-fill: '{colors.data-projected}'
+    band-opacity: 0.18
+    axis: '{colors.text-muted}'
+    gridline: '{colors.surface-sunken}'
+    hover-marker: '{colors.primary}'
+  fishery-picker:
+    input-background: '{colors.surface}'
+    input-border: '{colors.border}'
+    input-radius: '{rounded.sm}'
+    row-radius: '{rounded.sm}'
+    row-recent-background: '{colors.surface-muted}'
+  share-summary-view:
+    background: '{colors.surface}'
+    chrome: '{colors.primary}'
+    print-mode: 'monochrome — chrome and status colors collapse to {colors.text} on white for the printed/exported artifact; on-screen view keeps full color'
 ---
 
 ## Brand & Style
@@ -138,6 +155,7 @@ Visually, fishcast borrows WDFW's real palette and type system (sourced from `wd
 - **Yellow (`{colors.status-watch}`) / Red (`{colors.status-exceeded}`)** — threshold states only: approaching TAC (yellow) and projected-to-exceed or exceeded (red), both straight from the WDFW palette. Never used for anything else — a user should be able to learn "yellow = watch, red = stop" once and trust it everywhere in the app.
 - **Dark Gray (`{colors.data-reported}`, `#5A594D`)** — the **reported catch** data series (raw, unprocessed angler reports). Deliberately the least visually assertive of the three harvest numbers — it's a count, not a conclusion.
 - **Warm neutrals** (`{colors.surface-muted}`, `{colors.surface-sunken}`, `{colors.border}`) replace WDFW's print-oriented grays with a softer dashboard palette.
+- **Link blue** (`{colors.link}` / `{colors.link-visited}`) — reserved for true navigational hyperlinks only: the Share Summary's printable/shareable link and the picker's "see the full list" empty-state link. Everything else that looks clickable (mode toggle, picker rows, badges) is a button or tap target, not a link, and should never use this color.
 
 Avoid: introducing any new chromatic color beyond this set, using status colors (green/yellow/red) for anything other than threshold state, and ever rendering reported/estimated/projected harvest numbers in the same color — that collapse is the one mistake this product cannot make (see PRD FR-3, FR-7).
 
@@ -163,7 +181,11 @@ Minimal. Cards are distinguished by a 1px `{colors.border}` outline and a flat `
 
 - **Status badge** (`{components.status-badge}`) — pill, three variants (safe / watch / exceeded). Always paired with a text label ("Under threshold" / "Approaching" / "Exceeded"), never color alone.
 - **Mode toggle** (`{components.mode-toggle}`) — segmented control, two options (Manager / Angler), lives in the header, persists across fishery navigation.
-- **Harvest number** (`{components.harvest-number}`) — the visual contract for the three harvest figures: reported is a hollow/outline numeral, estimated is solid, projected is set with a dashed underline and shown with its uncertainty range. The three must always appear together with this same treatment, never re-skinned per-screen.
+- **Harvest number trio** (`{components.harvest-number-trio}`) — the visual contract for the three harvest figures: reported is a hollow/outline numeral, estimated is solid, projected is set with a dashed underline and shown with its uncertainty range. The three must always appear together with this same treatment, never re-skinned per-screen.
+- **Projection band chart** (`{components.projection-band-chart}`) — the highest-stakes visual in the product: a line in `{colors.data-projected}` with a low-opacity (`band-opacity: 0.18`) fill of the same color marking the uncertainty range, plotted against a muted axis (`{colors.text-muted}`) and faint gridlines (`{colors.surface-sunken}`). Hovering/tapping a point shows a `{colors.primary}` marker and reveals the exact value + range as text — the chart is never the only way to read a number.
+- **Fishery/season picker** (`{components.fishery-picker}`) — a combobox: `{rounded.sm}` input, `{rounded.sm}` dropdown rows. Recently-viewed rows get a `{colors.surface-muted}` background to visually separate them from the rest of the filtered list, no other treatment difference.
+- **Share Summary view** (`{components.share-summary-view}`) — reuses the standard card grid on-screen with full `{colors.primary}` chrome; the printed/exported artifact strips to monochrome (`{colors.text}` on white) so it photocopies and prints cleanly for a co-manager briefing.
+- **Accuracy strip** — no new tokens; it reuses `{components.harvest-number-trio}`'s `estimated` treatment for the confirmed-actual point and its `projected` treatment for the past projection's band, so a past-projection-vs-actual comparison reads with the same visual grammar a user already learned from the Angler/Manager views.
 - **Card** (`{components.card}`) — the base container for every status, snapshot, and projection block.
 
 ## Do's and Don'ts
@@ -175,3 +197,4 @@ Minimal. Cards are distinguished by a 1px `{colors.border}` outline and a flat `
 | Pair every status badge with a text label | Rely on color alone to convey threshold state |
 | Keep the WDFW palette and Roboto/Roboto Slab type | Recreate WDFW's dense government-report table chrome |
 | Flat cards, 1px border, minimal shadow | Add gradients, glossy buttons, or marketing-style hero imagery |
+| Strip Share Summary exports to monochrome for printing | Print full-color chrome that wastes a co-manager's printer ink or misreads on a black-and-white fax/scan |

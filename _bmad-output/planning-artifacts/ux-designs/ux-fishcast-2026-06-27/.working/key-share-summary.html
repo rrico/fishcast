@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>fishcast — Share Summary</title>
+<style>
+/*
+  Spine sections illustrated:
+  - EXPERIENCE.md Information Architecture: "Share Summary | 'Share' action on Manager View | Exportable/printable view for briefing co-managers (FR-6)"
+  - EXPERIENCE.md Component Patterns: "Share Summary action" — frozen snapshot as of generation time, explicitly timestamped ("Snapshot as of {date}"), one click one artifact, no live-editing/commenting
+  - DESIGN.md components.share-summary-view: on-screen keeps full {colors.primary} chrome; print-mode collapses chrome/status colors to {colors.text} on white
+  - EXPERIENCE.md Component Patterns: "Harvest number trio" reused with same treatment
+  - EXPERIENCE.md IA: "Modal/sheet stacking is one level deep at most (e.g., Share Summary opens as an overlay on Manager View, nothing opens on top of it)"
+  - DESIGN.md Do's/Don'ts: "Strip Share Summary exports to monochrome for printing"
+  - EXPERIENCE.md Key Flow 1 step 5: "taps Share Summary, gets a printable/link view of the current status, and sends it to the tribal co-managers"
+  This mock shows two states side by side per the renderer spec's "load-bearing alternate state" allowance: left = on-screen overlay (full color), right = printed/exported artifact (monochrome).
+*/
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #EFEEEA;
+  font-family: 'Roboto', Arial, sans-serif;
+  color: #222222;
+  padding: 40px 0;
+}
+
+.stage {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 28px;
+  align-items: start;
+}
+
+.col-label {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #5A594D;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* ===== On-screen overlay (browser frame + dimmed backdrop + modal) ===== */
+.browser-frame {
+  background: #FFFFFF;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  border: 1px solid #D1D3D4;
+  position: relative;
+}
+.browser-chrome {
+  background: #F7F7F5;
+  border-bottom: 1px solid #D1D3D4;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.browser-dot { width: 11px; height: 11px; border-radius: 9999px; background: #D1D3D4; }
+.browser-urlbar {
+  margin-left: 10px; flex: 1;
+  background: #FFFFFF; border: 1px solid #D1D3D4; border-radius: 9999px;
+  font-size: 12px; color: #5A594D; padding: 5px 14px;
+}
+
+.backdrop {
+  background: rgba(34,34,34,0.55);
+  padding: 26px 26px 32px;
+  min-height: 560px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.dimmed-header {
+  position: absolute;
+  top: 41px; left: 0; right: 0;
+  background: #0F426B;
+  color: #FFFFFF;
+  padding: 14px 28px;
+  opacity: 0.35;
+  font-family: 'Roboto Slab', Georgia, serif;
+  font-size: 18px;
+}
+
+.modal {
+  margin-top: 30px;
+  background: #FFFFFF;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 480px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+.modal-chrome {
+  background: #0F426B;
+  color: #FFFFFF;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-chrome .title { font-family: 'Roboto Slab', Georgia, serif; font-size: 17px; }
+.modal-chrome .close { font-size: 18px; opacity: 0.8; }
+
+.modal-body { padding: 20px; }
+
+.snapshot-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  color: #5A594D;
+  background: #F7F7F5;
+  border: 1px solid #D1D3D4;
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin-bottom: 16px;
+}
+
+.summary-heading { font-family: 'Roboto Slab', Georgia, serif; font-size: 18px; color: #59594A; margin-bottom: 4px; }
+.summary-sub { font-size: 13px; color: #5A594D; margin-bottom: 16px; }
+
+.species-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid #EFEEEA;
+}
+.species-line:first-of-type { border-top: 1px solid #D1D3D4; margin-top: 4px; }
+.species-line .name { font-size: 14px; font-weight: 500; color: #222222; }
+.species-line .nums { font-size: 12px; color: #5A594D; }
+
+.status-badge { display: inline-flex; align-items: center; border-radius: 9999px; font-size: 11px; font-weight: 500; padding: 4px 11px; }
+.status-badge.safe { background: #007B55; color: #FFFFFF; }
+.status-badge.watch { background: #FFD12E; color: #222222; }
+
+.link-row { margin-top: 16px; font-size: 13px; }
+.link-row a { color: #18459A; text-decoration: underline; }
+
+.modal-footer {
+  padding: 14px 20px;
+  background: #F7F7F5;
+  border-top: 1px solid #D1D3D4;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.btn-secondary { background: #FFFFFF; border: 1px solid #D1D3D4; border-radius: 8px; padding: 9px 16px; font-size: 13px; color: #222222; }
+.btn-primary { background: #0F426B; color: #FFFFFF; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 500; }
+
+/* ===== Printed/exported artifact — monochrome ===== */
+.print-sheet {
+  background: #FFFFFF;
+  border: 1px solid #D1D3D4;
+  border-radius: 4px;
+  padding: 32px;
+  font-family: 'Roboto', Arial, sans-serif;
+  color: #222222;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.print-sheet * { color: #222222 !important; }
+.print-masthead {
+  font-family: 'Roboto Slab', Georgia, serif;
+  font-size: 20px;
+  border-bottom: 2px solid #222222;
+  padding-bottom: 10px;
+  margin-bottom: 4px;
+}
+.print-snapshot-line { font-size: 12px; margin-bottom: 18px; }
+.print-fishery { font-family: 'Roboto Slab', Georgia, serif; font-size: 17px; margin-bottom: 14px; }
+
+.print-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
+.print-table th, .print-table td { border: 1px solid #222222; padding: 6px 8px; text-align: left; }
+.print-table th { font-weight: 500; background: #F7F7F5 !important; }
+.print-status { font-weight: 500; }
+.print-status::before { content: "● "; }
+
+.print-footer { margin-top: 18px; font-size: 11px; border-top: 1px solid #D1D3D4; padding-top: 10px; }
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <div>
+    <div class="col-label">On-screen overlay (full color chrome)</div>
+    <div class="browser-frame">
+      <div class="browser-chrome">
+        <div class="browser-dot"></div><div class="browser-dot"></div><div class="browser-dot"></div>
+        <div class="browser-urlbar">fishcast.app/skagit/manager</div>
+      </div>
+      <div class="dimmed-header">fishcast — Manager View</div>
+      <div class="backdrop">
+        <div class="modal">
+          <div class="modal-chrome">
+            <span class="title">Share Summary</span>
+            <span class="close">&times;</span>
+          </div>
+          <div class="modal-body">
+            <div class="snapshot-tag">Snapshot as of June 26, 2026, 6:00 PM</div>
+            <div class="summary-heading">Skagit — current season</div>
+            <div class="summary-sub">Frozen at generation time — reopening this link later shows these same numbers, not live data.</div>
+
+            <div class="species-line">
+              <span class="name">Puget Sound Chinook</span>
+              <span class="nums">Est. 1,260 · proj. 1,310–1,480</span>
+              <span class="status-badge watch">Approaching</span>
+            </div>
+            <div class="species-line">
+              <span class="name">Coho</span>
+              <span class="nums">Est. 2,440 · proj. 2,510–2,690</span>
+              <span class="status-badge safe">Under threshold</span>
+            </div>
+            <div class="species-line">
+              <span class="name">Sockeye</span>
+              <span class="nums">Est. 412 · proj. 380–460</span>
+              <span class="status-badge safe">Under threshold</span>
+            </div>
+
+            <div class="link-row">Shareable link: <a href="#">fishcast.app/share/skagit-20260626-1800</a></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-secondary">Copy link</button>
+            <button class="btn-primary">Download printable PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="col-label">Printed / exported artifact (monochrome)</div>
+    <div class="print-sheet">
+      <div class="print-masthead">fishcast</div>
+      <div class="print-snapshot-line">Snapshot as of June 26, 2026, 6:00 PM — frozen at generation time.</div>
+      <div class="print-fishery">Skagit — current season — Management Summary</div>
+
+      <table class="print-table">
+        <thead>
+          <tr><th>Species</th><th>Status</th><th>Estimated</th><th>Projected (7-day)</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Puget Sound Chinook (ESA-listed)</td>
+            <td class="print-status">Approaching threshold</td>
+            <td>1,260</td>
+            <td>1,310–1,480</td>
+          </tr>
+          <tr>
+            <td>Coho</td>
+            <td class="print-status">Under threshold</td>
+            <td>2,440</td>
+            <td>2,510–2,690</td>
+          </tr>
+          <tr>
+            <td>Sockeye</td>
+            <td class="print-status">Under threshold</td>
+            <td>412</td>
+            <td>380–460</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="print-footer">Prepared for co-manager briefing — fishcast (not an official WDFW product). For discussion of fishery status only.</div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

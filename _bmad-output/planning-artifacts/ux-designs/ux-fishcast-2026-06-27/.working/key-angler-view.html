@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>fishcast — Angler View</title>
+<style>
+/*
+  Spine sections illustrated:
+  - EXPERIENCE.md Key Flow 2 (TrollRay, Skagit Sockeye 2026): reported/estimated/projected snapshot, projection band through Saturday, Forecast Accuracy link
+  - DESIGN.md components.harvest-number-trio: reported = hollow/outline numeral (data-reported #5A594D), estimated = solid fill (data-estimated #0F426B), projected = dashed line + shaded band (data-projected #92D2D8)
+  - DESIGN.md components.projection-band-chart: line + band-opacity 0.18 fill in data-projected, muted axis, faint surface-sunken gridlines, primary hover marker
+  - EXPERIENCE.md Component Patterns: "Harvest number trio" (always render together, same order), "Projection band chart" (1-7 days out, tap/hover reveals point + range as text)
+  - EXPERIENCE.md Accessibility Floor: chart has text/table equivalent without relying on hover
+  - EXPERIENCE.md Responsive & Platform: phone is primary surface for Angler View (this mock uses a phone frame)
+  - EXPERIENCE.md Voice and Tone: "Estimated harvest: 412 fish (as of June 26)", "projected range: 380-460"
+*/
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #EFEEEA;
+  font-family: 'Roboto', Arial, sans-serif;
+  color: #222222;
+  padding: 40px 0;
+}
+
+/* Phone frame */
+.phone-frame {
+  max-width: 390px;
+  margin: 0 auto;
+  background: #111111;
+  border-radius: 36px;
+  padding: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.phone-screen {
+  background: #FFFFFF;
+  border-radius: 24px;
+  overflow: hidden;
+}
+.phone-notch {
+  background: #111111;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.phone-notch .pill { width: 70px; height: 6px; border-radius: 9999px; background: #333; }
+
+.app-header {
+  background: #0F426B;
+  color: #FFFFFF;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.app-name {
+  font-family: 'Roboto Slab', Georgia, serif;
+  font-size: 17px;
+  font-weight: 400;
+}
+.mode-toggle {
+  background: rgba(255,255,255,0.16);
+  border-radius: 9999px;
+  display: inline-flex;
+  padding: 3px;
+}
+.mode-toggle button {
+  border: none;
+  background: transparent;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #FFFFFF;
+  padding: 7px 13px;
+  border-radius: 9999px;
+}
+.mode-toggle button.active { background: #FFFFFF; color: #0F426B; }
+
+.fishery-bar {
+  padding: 10px 18px;
+  border-bottom: 1px solid #D1D3D4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.fishery-bar .name {
+  font-family: 'Roboto Slab', Georgia, serif;
+  font-size: 16px;
+  color: #59594A;
+}
+.fishery-bar .change {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 12px;
+  color: #18459A;
+}
+
+.scroll-area { padding: 16px; }
+
+.asof-note {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 12px;
+  color: #5A594D;
+  margin-bottom: 14px;
+}
+
+.card {
+  background: #FFFFFF;
+  border: 1px solid #D1D3D4;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-family: 'Roboto Slab', Georgia, serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #59594A;
+  margin-bottom: 14px;
+}
+
+/* Harvest number trio - stacked on mobile, same order: reported -> estimated -> projected */
+.trio-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #EFEEEA;
+}
+.trio-item:last-child { border-bottom: none; }
+.trio-label {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #5A594D;
+  text-transform: uppercase;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.trio-label .sub { font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; color: #5A594D; }
+
+.trio-value {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+.trio-value.reported {
+  color: #FFFFFF;
+  -webkit-text-stroke: 1.5px #5A594D;
+}
+.trio-value.estimated { color: #0F426B; }
+.trio-value.projected {
+  color: #92D2D8;
+  border-bottom: 2px dashed #92D2D8;
+  padding-bottom: 2px;
+}
+.trio-value .unit { font-size: 14px; font-weight: 400; color: #5A594D; margin-left: 4px; -webkit-text-stroke: 0; }
+
+/* Projection band chart */
+.chart-card .card-title { margin-bottom: 4px; }
+.chart-sub {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 12px;
+  color: #5A594D;
+  margin-bottom: 14px;
+}
+.chart-svg-wrap { width: 100%; }
+.chart-tooltip {
+  position: relative;
+  margin-top: -2px;
+}
+.tooltip-box {
+  background: #F7F7F5;
+  border: 1px solid #D1D3D4;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 12px;
+  color: #222222;
+  margin-top: 8px;
+}
+.tooltip-box b { color: #0F426B; }
+
+.chart-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 11px;
+}
+.chart-table caption {
+  text-align: left;
+  font-size: 11px;
+  color: #5A594D;
+  margin-bottom: 4px;
+}
+.chart-table th, .chart-table td {
+  text-align: center;
+  padding: 4px 2px;
+  color: #5A594D;
+  border-top: 1px solid #EFEEEA;
+}
+.chart-table th { font-weight: 500; color: #222222; }
+
+.accuracy-link {
+  display: block;
+  text-align: center;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 13px;
+  color: #18459A;
+  text-decoration: underline;
+  padding: 6px 0 4px;
+}
+
+.legend {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #5A594D; }
+.legend-swatch { width: 14px; height: 3px; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="phone-frame">
+  <div class="phone-screen">
+    <div class="phone-notch"><div class="pill"></div></div>
+
+    <div class="app-header">
+      <div class="app-name">fishcast</div>
+      <div class="mode-toggle">
+        <button class="active">Angler</button>
+        <button>Manager</button>
+      </div>
+    </div>
+
+    <div class="fishery-bar">
+      <span class="name">Skagit Sockeye 2026</span>
+      <span class="change">Change</span>
+    </div>
+
+    <div class="scroll-area">
+      <div class="asof-note">As of June 26, 2026</div>
+
+      <div class="card">
+        <div class="card-title">Harvest snapshot</div>
+
+        <div class="trio-item">
+          <span class="trio-label">Reported catch-to-date<span class="sub">Raw angler reports</span></span>
+          <span class="trio-value reported">368<span class="unit">fish</span></span>
+        </div>
+        <div class="trio-item">
+          <span class="trio-label">Estimated harvest-to-date<span class="sub">Statistical expansion</span></span>
+          <span class="trio-value estimated">412<span class="unit">fish</span></span>
+        </div>
+        <div class="trio-item">
+          <span class="trio-label">Projected by Sat, June 28<span class="sub">Forward forecast, 7-day window</span></span>
+          <span class="trio-value projected">380–460<span class="unit">fish</span></span>
+        </div>
+      </div>
+
+      <div class="card chart-card">
+        <div class="card-title">7-day harvest projection</div>
+        <div class="chart-sub">Today through Fri, July 3 — tap a day for the exact value and range.</div>
+
+        <div class="chart-svg-wrap">
+          <svg viewBox="0 0 320 150" width="100%" height="150" role="img" aria-label="Projection band chart, today through next 7 days, range narrows toward later days">
+            <!-- gridlines -->
+            <line x1="0" y1="20" x2="320" y2="20" stroke="#EFEEEA" stroke-width="1"/>
+            <line x1="0" y1="60" x2="320" y2="60" stroke="#EFEEEA" stroke-width="1"/>
+            <line x1="0" y1="100" x2="320" y2="100" stroke="#EFEEEA" stroke-width="1"/>
+            <line x1="0" y1="140" x2="320" y2="140" stroke="#5A594D" stroke-width="1"/>
+
+            <!-- uncertainty band -->
+            <path d="M10,95 C60,85 110,55 160,42 C210,32 260,28 310,22 L310,55 C260,52 210,55 160,68 C110,82 60,112 10,125 Z" fill="#92D2D8" fill-opacity="0.18"/>
+
+            <!-- projected line (dashed) -->
+            <path d="M10,110 C60,98 110,68 160,55 C210,42 260,40 310,38" fill="none" stroke="#92D2D8" stroke-width="2.5" stroke-dasharray="6,4"/>
+
+            <!-- hover marker on Saturday -->
+            <circle cx="160" cy="55" r="5" fill="#0F426B"/>
+            <line x1="160" y1="0" x2="160" y2="150" stroke="#0F426B" stroke-width="1" stroke-dasharray="2,3" opacity="0.5"/>
+
+            <!-- axis labels -->
+            <text x="10" y="148" font-family="Roboto" font-size="9" fill="#5A594D">Thu</text>
+            <text x="55" y="148" font-family="Roboto" font-size="9" fill="#5A594D">Fri</text>
+            <text x="150" y="148" font-family="Roboto" font-size="9" fill="#5A594D">Sat</text>
+            <text x="245" y="148" font-family="Roboto" font-size="9" fill="#5A594D">Sun</text>
+            <text x="295" y="148" font-family="Roboto" font-size="9" fill="#5A594D">Wed</text>
+          </svg>
+        </div>
+
+        <div class="legend">
+          <span class="legend-item"><span class="legend-swatch" style="background:#92D2D8;"></span>Projected range</span>
+          <span class="legend-item"><span class="legend-swatch" style="background:#0F426B; height:8px; border-radius:9999px; width:8px;"></span>Selected day</span>
+        </div>
+
+        <div class="tooltip-box">
+          <b>Saturday, June 28:</b> point estimate 420 fish, projected range 380–460. Stays strong relative to the season's pace so far.
+        </div>
+
+        <table class="chart-table">
+          <caption>Text equivalent of the chart above — point estimate and range per day</caption>
+          <thead>
+            <tr><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>402<br>380–425</td><td>410<br>378–442</td><td><b>420</b><br>380–460</td><td>424<br>378–468</td><td>428<br>376–474</td><td>431<br>372–480</td><td>434<br>368–486</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <a class="accuracy-link" href="#">See last week's projection vs. confirmed estimate →</a>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

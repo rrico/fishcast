@@ -2,7 +2,7 @@
 name: fishcast
 status: draft
 sources:
-  - "{planning_artifacts}/prds/prd-fishcast-2026-06-27/prd.md"
+  - "{planning_artifacts}/prd-fishcast-2026-06-27/prd.md"
 updated: 2026-06-27
 ---
 
@@ -50,10 +50,10 @@ Behavioral. Visual specs live in `DESIGN.md.Components`.
 |---|---|---|
 | Status badge | Manager View, Fishery Picker row | Three states only: under / approaching / exceeded threshold (FR-5). Always text + color. Recalculates whenever new creel data lands — never a static label. |
 | Mode toggle | Header, global | Two-way switch, Manager/Angler. Switching preserves the active fishery and season; never resets to the picker. |
-| Harvest number trio | Angler View, Manager View | Reported, estimated, and projected always render together, in that left-to-right or top-to-bottom order, using `DESIGN.md.components.harvest-number` styling. Never show one without the others in context — the comparison *is* the feature. |
-| Projection band chart | Angler View, Manager View | Line + shaded uncertainty band, 1–7 days out (FR-4). Tapping/hovering a day reveals the point estimate and range as text (accessibility + precision). Recomputes and redraws when new data arrives — no stale silent chart. |
-| Fishery/season picker | Fishery Picker, header (persistent) | Type-to-filter combobox, not a long unfiltered list — v1 covers a defined but non-trivial set of WA rivers + marine areas (PRD open question §8.4). Recently viewed fisheries surface first. |
-| Share Summary action | Manager View | Generates a static, shareable/printable view (link or export) — no live-editing, no commenting. One click, one artifact (FR-6). |
+| Harvest number trio | Angler View, Manager View | Reported, estimated, and projected always render together, in that left-to-right or top-to-bottom order, using `DESIGN.md.components.harvest-number-trio` styling. Never show one without the others in context — the comparison *is* the feature. |
+| Projection band chart | Angler View, Manager View | Line + shaded uncertainty band, 1–7 days out (FR-4). Tapping/hovering a day reveals the point estimate and range as text (accessibility + precision). Recomputes and redraws when new data arrives — no stale silent chart. If a fishery is missing one environmental predictor (e.g. a marine fishery's tide feed, vs. a river fishery's flow feed, per FR-2), the chart still renders using available predictors and the "as of" note names which signal is missing — never a hidden silent narrowing of the band. |
+| Fishery/season picker | Fishery Picker, header (persistent) | Type-to-filter combobox, not a long unfiltered list — v1 covers a defined but non-trivial set of WA rivers + marine areas (PRD §8, open question 4). Recently viewed fisheries surface first. |
+| Share Summary action | Manager View | Generates a shareable/printable view (link or export) — no live-editing, no commenting. One click, one artifact (FR-6). The generated view is a **frozen snapshot as of generation time**, explicitly timestamped ("Snapshot as of {date}") — opening an old link later shows the same frozen numbers, never silently refreshed to current data, since a manager briefing co-managers needs the artifact to match what was said at the time. |
 | Accuracy strip | Forecast Accuracy view | Past projection (band) overlaid with the confirmed actual (point), per elapsed forecast. Framed in plain language first ("Last week's projection was within 18 fish"), raw error stats available but secondary (FR-8). |
 
 ## State Patterns
@@ -66,7 +66,10 @@ Behavioral. Visual specs live in `DESIGN.md.Components`.
 | Upstream source outage (data.wa.gov / NOAA / USGS) | Angler/Manager View | Show last-known good data with its timestamp; a small inline notice, not a blocking error page. Forecasting degrades gracefully (e.g., projection omits a missing environmental predictor) rather than disappearing entirely. |
 | Threshold exceeded | Manager View, Fishery Picker row | Badge switches to "exceeded" (red); this is the single most important state in the app and must be visible from the picker, not just inside the fishery's own view. |
 | Accuracy not yet available | Forecast Accuracy view | "Too recent to score — check back once {date}'s estimate is confirmed." Never show a comparison against unconfirmed data. |
+| No forecast history yet | Forecast Accuracy view | Distinct from "too recent to score": a fishery newly added to fishcast with zero elapsed projections. "fishcast hasn't tracked a forecast for {fishery} long enough yet — check back once the season's underway." |
+| Share generation failed | Manager View (Share Summary action) | Inline error on the action itself ("Couldn't generate the summary. Try again."); Manager View's own data is unaffected — failure is scoped to the export, never blocks the view it's exporting from. |
 | Empty fishery list / no match in picker | Fishery Picker | "No fishery matches '{query}'. fishcast currently covers {N} WA fisheries — see the full list." |
+| Fishery list loading (cold) | Fishery Picker | Skeleton rows while the fishery list itself loads; resolves to the real list or, on failure, "Couldn't load the fishery list. Try again." — distinct from "no match," which presumes the list loaded. |
 
 ## Interaction Primitives
 
@@ -116,3 +119,13 @@ Failure: the run is projected to taper sharply by Saturday → the projection ba
 - **Rejected — alerts/push notifications on threshold breach:** explicit PRD non-goal; a manager or angler must visit fishcast to get a read, fishcast never reaches out to them.
 - **Rejected — gamified accuracy scoring (streaks, leaderboards, badges for the model):** Forecast Accuracy exists to build calibrated trust, not to make the model's track record feel like a game.
 - **Rejected — single blended "harvest" number:** collapsing reported/estimated/projected into one figure would be easier to design but would misrepresent exactly the distinction (raw report vs. statistical expansion vs. forecast) the PRD requires to stay visible (FR-3, FR-7).
+
+## Responsive & Platform
+
+| Breakpoint | Behavior |
+|---|---|
+| `≥ md` (tablet/desktop) | Harvest number trio lays out left-to-right; projection chart sits full-width below it; Manager View's full number set (CPUE, effort, encounters) shows alongside the status badge in a multi-column card grid. |
+| `< md` (phone) | Harvest number trio stacks top-to-bottom (reported → estimated → projected, same order, same styling). Card grid collapses to a single column. Manager View's denser numbers (CPUE, effort, encounters) stay visible but stack — nothing is hidden on mobile, since a manager checking from the field needs the same facts as one at a desk. |
+| Chart (all breakpoints) | Resizes to container width; axis label density thins on narrow viewports rather than the chart scrolling horizontally. |
+
+fishcast is desktop-primary for the Manager View's working session but must never be phone-degraded for either view — both audiences may credibly be on a phone (a manager in the field, an angler on a boat ramp), so nothing in this table hides content on mobile, only reflows it.
