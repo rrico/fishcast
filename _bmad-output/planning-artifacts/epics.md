@@ -415,3 +415,138 @@ So that I can decide whether and when to go fishing.
 **Given** a phone-width viewport
 **When** rendered at `< md`
 **Then** the harvest number trio stacks top-to-bottom and the layout stays fully usable (UX-DR18, NFR-8)
+
+## Epic 2: Steelhead Manager Threshold Tracking
+
+Adds the Manager View: harvest vs. TAC/control-rule status, encounters, CPUE, effort, and the under/approaching/exceeded status badge, plus the Manager↔Angler mode toggle, for the same steelhead fishery/season established in Epic 1.
+
+**FRs covered:** FR-5
+**Known risk:** if the confirmed steelhead fishery turns out to be release-only or low-volume, the threshold-exceeded path won't be meaningfully validated against real data until Epic 5 introduces a harvestable species.
+
+### Story 2.1: SpeciesThreshold model and threshold data
+
+As a developer,
+I want a `SpeciesThreshold` model tied to a Season,
+So that the Manager View has a TAC/control-rule value to track harvest against.
+
+**Acceptance Criteria:**
+
+**Given** `apps/fisheries`
+**When** the model is added
+**Then** `SpeciesThreshold` exists linked to `Season`, carrying species name and a TAC/harvest-control-rule threshold value
+
+**Given** the confirmed steelhead fishery/season from Story 1.1
+**When** a migration is run
+**Then** one `SpeciesThreshold` row exists for steelhead with its real TAC/control-rule value documented in a decision note
+
+**Given** Django's built-in migration framework
+**When** `SpeciesThreshold` is added
+**Then** it is introduced via a migration, consistent with Story 1.2's schema-change convention
+
+### Story 2.2: Encounters, releases, CPUE, and effort in the estimation output
+
+As the pipeline,
+I want the PE estimation step to also produce total encounters, released fish, CPUE, and total angler effort,
+So that the Manager View has the full FR-5 number set, not just estimated harvest.
+
+**Acceptance Criteria:**
+
+**Given** normalized creel records already used by Story 1.5's estimation command
+**When** the adapted WDFW PE R script runs
+**Then** its flat-file output includes total encounters, released fish, CPUE, and total angler effort alongside the harvest estimate, for the same `(fishery, season, species, date)` (AD-3, AD-4)
+
+**Given** the R script's output
+**When** persisted
+**Then** these additional fields are upserted onto the same `HarvestEstimate` row keyed by `(fishery, season, species, date, method)` — no second table, no second key (AD-5, NFR-4)
+
+**Given** total angler effort is not available for a given date
+**When** the row is persisted
+**Then** the effort field is left null rather than a fabricated zero — "where available" per FR-5
+
+**Given** a pipeline run completes
+**When** these fields are written
+**Then** they share that run's single `as_of` timestamp alongside the harvest estimate (AD-5)
+
+### Story 2.3: Threshold status calculation
+
+As a manager,
+I want each tracked species' harvest compared against its `SpeciesThreshold`,
+So that I can see at a glance whether the fishery is under, approaching, or projected to exceed its limit.
+
+**Acceptance Criteria:**
+
+**Given** a species' latest `HarvestEstimate` and its `SpeciesThreshold`
+**When** the Manager View computes status
+**Then** it classifies the species as "under," "approaching," or "exceeded," computed at read-time from existing tables — no new pipeline-written status table (AD-1, AD-12-style read-time computation)
+
+**Given** the species' `ForecastProjection` shows the threshold being crossed within the projection window
+**When** status is computed
+**Then** the species is classified "approaching" (or "exceeded" if already past it) even if the current estimate alone is still under, so a manager sees the trend, not just the current snapshot
+
+**Given** new creel data lands and a `HarvestEstimate` changes
+**When** the Manager View is next loaded
+**Then** the status recalculates — never a static/cached label (per `EXPERIENCE.md` status badge behavioral rule)
+
+### Story 2.4: Mode toggle component
+
+As a user,
+I want a Manager/Angler mode toggle in the header,
+So that I can switch views without losing my selected fishery and season.
+
+**Acceptance Criteria:**
+
+**Given** a fishery/season selected in either mode
+**When** I click the mode toggle
+**Then** I land on the other mode's view for the same fishery/season — never reset to the Fishery Picker (UX-DR5)
+
+**Given** the mode toggle is rendered
+**When** styled
+**Then** it uses the segmented-control treatment from `DESIGN.md.components.mode-toggle` (UX-DR1-3)
+
+**Given** the toggle is evaluated for accessibility
+**When** checked
+**Then** it meets ≥44×44px tap targets (UX-DR15) and sits in the correct focus order: picker → mode toggle → harvest numbers → chart → share/accuracy links (UX-DR16)
+
+### Story 2.5: Manager View
+
+As a manager,
+I want to see total estimated harvest, released fish, total encounters, CPUE, total angler effort, and a threshold status badge for the confirmed steelhead fishery,
+So that I can decide whether the fishery needs a closure or extension conversation.
+
+**Acceptance Criteria:**
+
+**Given** a fishery/season in Manager mode
+**When** the Manager View loads
+**Then** it renders the status badge (UX-DR4) plus total estimated harvest, released fish, total encounters, CPUE, and total angler effort (where available) per species tracked under the season (FR-5)
+
+**Given** the status badge
+**When** rendered
+**Then** it is always paired with a text label ("Under threshold" / "Approaching" / "Exceeded"), never color alone (UX-DR4, UX-DR13, NFR-1)
+
+**Given** the fishery is in preseason, season-closed, data-pending, or upstream-outage state
+**When** the Manager View loads
+**Then** it shows the same state treatments already defined for the Angler View in Story 1.9 (UX-DR20-23), applied to the manager number set
+
+**Given** a `≥ md` viewport
+**When** the Manager View renders
+**Then** CPUE, effort, and encounters show alongside the status badge in a multi-column card grid (UX-DR17)
+
+**Given** a `< md` (phone) viewport
+**When** the Manager View renders
+**Then** the denser number set stays visible but stacks single-column — nothing hidden on mobile (UX-DR18, NFR-8)
+
+### Story 2.6: Threshold badge on the Fishery Picker
+
+As a manager scanning multiple fisheries,
+I want to see each fishery's threshold status directly on its Fishery Picker row,
+So that an exceeded threshold is visible before I even open that fishery's Manager View.
+
+**Acceptance Criteria:**
+
+**Given** the Fishery Picker's row for the confirmed steelhead fishery
+**When** the picker list renders
+**Then** the row shows the same status badge component used on the Manager View (UX-DR4), reflecting that fishery's current worst-case species status
+
+**Given** the status is "exceeded"
+**When** the picker row renders
+**Then** the red exceeded badge is visible on the row without needing to open the fishery (UX-DR24 — "the single most important state in the app... must be visible from the picker")
