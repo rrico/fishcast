@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1]
+stepsCompleted: [1, 2]
 inputDocuments:
   - "_bmad-output/planning-artifacts/prd-fishcast-2026-06-27/prd.md"
   - "_bmad-output/planning-artifacts/architecture/architecture-fishcast-2026-06-28/ARCHITECTURE-SPINE.md"
@@ -142,11 +142,38 @@ UX-DR29: Enforce banned interaction patterns are never implemented — no auto-r
 
 ### FR Coverage Map
 
-{{requirements_coverage_map}}
+FR-1: Epic 1 - Creel data ingestion, built for the confirmed steelhead fishery; broadened to remaining fisheries in Epic 5
+FR-2: Epic 1 - Environmental data ingestion, built for the confirmed steelhead fishery; broadened to remaining fisheries in Epic 5
+FR-3: Epic 1 - Estimated harvest-to-date, built for the confirmed steelhead fishery; broadened to remaining fisheries/species in Epic 5
+FR-4: Epic 1 - Forward harvest projection, built for the confirmed steelhead fishery; broadened to remaining fisheries/species in Epic 5
+FR-5: Epic 2 - Harvest status against control rule, built for the confirmed steelhead fishery; full multi-species coverage (Chinook, Coho, Sockeye) completes in Epic 5
+FR-6: Epic 3 - Shareable management summary, for the steelhead Manager View
+FR-7: Epic 1 - Fishery harvest snapshot (Angler View), built for the confirmed steelhead fishery; broadened to remaining fisheries/species in Epic 5
+FR-8: Epic 4 - Forecast accuracy view, for the steelhead fishery; broadened to remaining fisheries/species in Epic 5
 
 ## Epic List
 
-{{epics_list}}
+### Epic 1: Steelhead Angler Snapshot
+Stands up data ingestion (creel + environmental), the PE estimation/projection pipeline, and the Angler View so an angler can see reported/estimated/projected harvest for one confirmed steelhead fishery and decide whether to fish. Opens with a spike story to pin down which specific steelhead fishery/season is buildable now.
+**FRs covered:** FR-1, FR-2, FR-3, FR-4, FR-7
+
+### Epic 2: Steelhead Manager Threshold Tracking
+Adds the Manager View: harvest vs. TAC/control-rule status, encounters, CPUE, effort, and the under/approaching/exceeded status badge, plus the Manager↔Angler mode toggle, for the same steelhead fishery/season established in Epic 1.
+**FRs covered:** FR-5
+**Known risk:** if the confirmed steelhead fishery turns out to be release-only or low-volume, the threshold-exceeded path won't be meaningfully validated against real data until Epic 5 introduces a harvestable species.
+
+### Epic 3: Steelhead Shareable Management Summary
+Adds the Share Summary action on the Manager View — the web app's one write path, generating a frozen, printable/linkable snapshot for briefing co-managers.
+**FRs covered:** FR-6
+
+### Epic 4: Steelhead Forecast Accuracy
+Adds the read-time accuracy comparison (past projections vs. later-confirmed estimates) for the steelhead fishery, in plain language for non-technical anglers.
+**FRs covered:** FR-8
+**Known risk:** same deferred-validation concern as Epic 2 — near-zero harvest numbers make the accuracy comparison trivially "accurate" and won't stress-test calibration (NFR-7) until real variance exists via Epic 5.
+
+### Epic 5: Multi-Species & Multi-Fishery Expansion
+Seeds and validates the remaining FMP-tracked species (Chinook, Coho, Sockeye) and the rest of the v1 fishery list (other rivers + marine areas — PRD §8 open question 4) across ingestion, estimation, and all four views built in Epics 1–4. If Epic 2/4's known risks materialized, prioritizes pulling in a harvestable species early in this epic to retroactively validate the threshold and accuracy logic, rather than treating this purely as "seed more data."
+**FRs covered:** Broadens FR-1, FR-2, FR-3, FR-4, FR-5, FR-7, FR-8 to full v1 scope (no new FRs)
 
 <!-- Repeat for each epic in epics_list (N = 1, 2, 3...) -->
 
