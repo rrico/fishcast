@@ -175,27 +175,243 @@ Adds the read-time accuracy comparison (past projections vs. later-confirmed est
 Seeds and validates the remaining FMP-tracked species (Chinook, Coho, Sockeye) and the rest of the v1 fishery list (other rivers + marine areas — PRD §8 open question 4) across ingestion, estimation, and all four views built in Epics 1–4. If Epic 2/4's known risks materialized, prioritizes pulling in a harvestable species early in this epic to retroactively validate the threshold and accuracy logic, rather than treating this purely as "seed more data."
 **FRs covered:** Broadens FR-1, FR-2, FR-3, FR-4, FR-5, FR-7, FR-8 to full v1 scope (no new FRs)
 
-<!-- Repeat for each epic in epics_list (N = 1, 2, 3...) -->
+## Epic 1: Steelhead Angler Snapshot
 
-## Epic {{N}}: {{epic_title_N}}
+Stands up data ingestion (creel + environmental), the PE estimation/projection pipeline, and the Angler View so an angler can see reported/estimated/projected harvest for one confirmed steelhead fishery and decide whether to fish. Opens with a spike story to pin down which specific steelhead fishery/season is buildable now.
 
-{{epic_goal_N}}
+**FRs covered:** FR-1, FR-2, FR-3, FR-4, FR-7
 
-<!-- Repeat for each story (M = 1, 2, 3...) within epic N -->
+### Story 1.1: Confirm steelhead fishery, season, and data coverage
 
-### Story {{N}}.{{M}}: {{story_title_N_M}}
-
-As a {{user_type}},
-I want {{capability}},
-So that {{value_benefit}}.
+As the builder,
+I want to confirm a specific steelhead fishery, season, and its data coverage,
+So that I can build the rest of Epic 1 against a validated real target instead of an assumption.
 
 **Acceptance Criteria:**
 
-<!-- for each AC on this story -->
+**Given** the WA steelhead fisheries listed in data.wa.gov's creel survey data
+**When** I review fisheries with active retention seasons (not catch-and-release-only)
+**Then** I select one specific river fishery + season with non-trivial harvest data and document its `wdfw_code`
 
-**Given** {{precondition}}
-**When** {{action}}
-**Then** {{expected_outcome}}
-**And** {{additional_criteria}}
+**Given** the selected fishery's location
+**When** I check USGS and NOAA station directories
+**Then** I identify and record a USGS gauge site ID and a NOAA weather grid reference for that location
 
-<!-- End story repeat -->
+**Given** WDFW's `wdfw-fp/CreelEstimates` and `creelutils` repositories
+**When** I review their methodology and species coverage
+**Then** I confirm whether their PE approach can be adapted for the selected steelhead fishery without new methodology
+
+**Given** the current date
+**When** I check the selected fishery's season dates
+**Then** I confirm whether the season is open now or within the build window
+**And** document the fallback plan if it is off-season
+
+**Given** the decisions above
+**When** the spike is complete
+**Then** I record the confirmed fishery name, `wdfw_code`, season dates, USGS gauge ID, NOAA weather grid reference, and PE-coverage finding in a decision note that later stories reference
+
+### Story 1.2: Core domain models (Fishery, Season)
+
+As a developer,
+I want the Fishery and Season models scaffolded in a Django project,
+So that ingestion and estimation stories have a stable schema to write against.
+
+**Acceptance Criteria:**
+
+**Given** a fresh Django project following the Architecture Spine's structure (`config/`, `apps/fisheries`, `apps/ingestion`, `apps/estimation`, `apps/dashboard`, `r/`, `templates/`, `static/`, `.github/workflows/`)
+**When** the project is initialized
+**Then** `apps/fisheries` exists with a `Fishery` model carrying `wdfw_code`, a USGS gauge site ID field, a NOAA tide-station ID field, and a NOAA weather grid reference field (AD-11)
+**And** a `Season` model linked to `Fishery`
+
+**Given** the confirmed steelhead fishery from Story 1.1
+**When** a migration is run
+**Then** one `Fishery` row and one `Season` row exist matching the decision note's values
+
+**Given** Django's built-in migration framework
+**When** models change
+**Then** migrations are the only mechanism used for schema changes
+
+### Story 1.3: Creel data ingestion
+
+As the pipeline,
+I want to ingest creel survey data from data.wa.gov for the confirmed steelhead fishery,
+So that raw catch reports are available for statistical expansion.
+
+**Acceptance Criteria:**
+
+**Given** a registered data.wa.gov app token stored as a GitHub Actions secret
+**When** `ingest_creel` runs for the confirmed fishery and a date range
+**Then** it authenticates using the token
+**And** stores each record as a `RawCreelRecord` verbatim
+
+**Given** a raw creel record
+**When** it is normalized
+**Then** a `NormalizedCreelRecord` is upserted keyed by `(fishery, date, source)` without mutating or deleting the `RawCreelRecord` it derived from (AD-6)
+
+**Given** data.wa.gov returns a rate-limit response
+**When** `ingest_creel` is running
+**Then** it backs off and retries rather than failing the overall ingestion job
+
+**Given** the command is re-run for an already-processed date range
+**When** it executes
+**Then** no duplicate rows are created — writes use `INSERT ... ON CONFLICT DO UPDATE` (AD-5, NFR-4)
+
+### Story 1.4: Environmental data ingestion
+
+As the pipeline,
+I want to ingest weather and river flow data for the confirmed steelhead fishery's river,
+So that the estimation step has environmental predictors to use.
+
+**Acceptance Criteria:**
+
+**Given** the confirmed fishery's USGS gauge site ID and NOAA weather grid reference
+**When** `ingest_environmental` runs
+**Then** it fetches a 7-day weather forecast and river flow readings, matching by the provider-specific IDs the source itself uses (AD-11)
+
+**Given** the fishery is a river-system fishery
+**When** `ingest_environmental` runs
+**Then** it ingests weather + river flow, not tide data
+
+**Given** each environmental reading
+**When** stored
+**Then** it is upserted into `EnvironmentalReading` keyed by `(fishery, date, source)`
+
+**Given** NOAA or USGS is unavailable
+**When** `ingest_environmental` runs
+**Then** that source's failure is logged and skipped while the other source's ingestion still completes (NFR-2)
+
+### Story 1.5: Estimated harvest-to-date
+
+As an angler,
+I want an estimated harvest-to-date for the confirmed steelhead fishery,
+So that I can see a statistically expanded number rather than just raw reports.
+
+**Acceptance Criteria:**
+
+**Given** normalized creel records for the confirmed fishery/season
+**When** the estimation command runs
+**Then** it writes prepared input to a flat file and invokes the adapted WDFW PE R/Stan script via an `Rscript` subprocess, reading its file output back (AD-3, AD-4)
+
+**Given** the R script's output
+**When** persisted
+**Then** a `HarvestEstimate` row is upserted keyed by `(fishery, season, species, date, method=PE)` with a date-only date
+
+**Given** the fishery is active
+**When** the pipeline runs
+**Then** a new `HarvestEstimate` is produced at least once per day
+
+**Given** a pipeline run completes
+**When** its rows are written
+**Then** they all share that run's single `as_of` timestamp (AD-5)
+
+### Story 1.6: Forward harvest projection
+
+As an angler,
+I want a probabilistic forward harvest projection for the confirmed steelhead fishery,
+So that I can decide whether to fish in the coming week.
+
+**Acceptance Criteria:**
+
+**Given** `HarvestEstimate` history and the latest `EnvironmentalReading` data
+**When** the projection R script runs
+**Then** it produces a forward projection for each of the next 7 days, each with a `lower_bound` and `upper_bound`
+
+**Given** the projection output
+**When** persisted
+**Then** a `ForecastProjection` row is upserted per target date, keyed by `(fishery, season, species, date, method)`
+
+**Given** new data arrives on a later pipeline run
+**When** the projection is recomputed
+**Then** existing rows for affected target dates are updated via upsert, not duplicated
+
+**Given** the fishery is missing one environmental predictor
+**When** the projection runs
+**Then** it still produces a projection using available predictors (graceful degradation)
+
+### Story 1.7: Scheduled pipeline wiring
+
+As the builder,
+I want ingestion and estimation to run automatically on a daily schedule,
+So that the Angler View always has current data without manual intervention.
+
+**Acceptance Criteria:**
+
+**Given** `.github/workflows/pipeline.yml`
+**When** the scheduled trigger fires daily
+**Then** it runs creel ingestion, environmental ingestion, PE estimation, and projection in sequence for the confirmed fishery
+
+**Given** the pipeline's required secrets
+**When** the workflow runs
+**Then** it reads them from GitHub Actions secrets — none committed to the repo (NFR-5)
+
+**Given** the workflow runs on GitHub Actions
+**When** executed
+**Then** no pipeline logic runs inside a Vercel Function (AD-2, NFR-9)
+
+**Given** one ingestion source fails during a scheduled run
+**When** the workflow completes
+**Then** the run still completes for the other sources/steps (NFR-2)
+
+### Story 1.8: Fishery/season picker
+
+As an angler,
+I want to find and select the confirmed steelhead fishery and season,
+So that I can get to its harvest snapshot.
+
+**Acceptance Criteria:**
+
+**Given** the fishery list
+**When** I open fishcast
+**Then** I land on the Fishery Picker with a type-to-filter combobox (UX-DR8) styled with the fishcast tokens (UX-DR1-3) and base Card component (UX-DR9)
+
+**Given** the fishery list is loading
+**When** the page first renders
+**Then** skeleton rows are shown (UX-DR28), resolving to the real list or a load-failure message
+
+**Given** I type a query matching no fishery
+**When** the filtered list is empty
+**Then** I see the "No fishery matches" empty state (UX-DR27)
+
+**Given** the picker is rendered
+**When** evaluated for accessibility
+**Then** rows meet ≥44×44px tap targets (UX-DR15) and WCAG 2.2 AA contrast (UX-DR12)
+
+### Story 1.9: Angler View
+
+As an angler,
+I want to see reported, estimated, and projected harvest for the confirmed steelhead fishery,
+So that I can decide whether and when to go fishing.
+
+**Acceptance Criteria:**
+
+**Given** a fishery/season selected from the picker
+**When** the Angler View loads
+**Then** it renders the harvest number trio (reported/estimated/projected) together, in order, per UX-DR6
+
+**Given** `ForecastProjection` data for the next 7 days
+**When** the view renders
+**Then** it shows the projection band chart embedded in the server-rendered page, no separate fetch endpoint (AD-7)
+
+**Given** I hover or tap a chart point
+**When** I interact with it
+**Then** the exact value and range are revealed as text (UX-DR7, UX-DR14)
+
+**Given** the fishery is in its preseason period
+**When** the view renders
+**Then** it shows the "opens {date}, no data yet" state with no zero-rendered numbers (UX-DR20)
+
+**Given** the season has closed
+**When** the view renders
+**Then** final numbers are shown labeled "Final" with no forward projection (UX-DR21)
+
+**Given** today's creel data hasn't been processed yet
+**When** the view renders
+**Then** the last successful "as of {date}" timestamp is shown plainly (UX-DR22)
+
+**Given** an upstream source outage
+**When** the view renders
+**Then** last-known-good data is shown with its timestamp and a small inline notice, not a blocking error page (UX-DR23)
+
+**Given** a phone-width viewport
+**When** rendered at `< md`
+**Then** the harvest number trio stacks top-to-bottom and the layout stays fully usable (UX-DR18, NFR-8)
